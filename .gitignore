@@ -8,6 +8,8 @@ install_manifest.txt
 .DS_Store
 wbuild
 DerivedData
+.vscode/
+local/
 
 # Created by https://www.toptal.com/developers/gitignore/api/c++,python
 # Edit at https://www.toptal.com/developers/gitignore?templates=c++,python
