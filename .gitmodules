@@ -9,4 +9,4 @@
 	url = https://github.com/bombela/backward-cpp.git
 [submodule "libs/Empirical"]
 	path = libs/Empirical
-	url = https://github.com/devosoft/Empirical.git
+	url = https://github.com/amlalejini/Empirical.git
