@@ -68,20 +68,20 @@ struct Phenotype {
   emp::vector<int> final_task_count;
 
   bool operator==(const Phenotype & other) const {
-    return gestation_time == other.gestation_time && final_task_count == other.final_task_count; 
+    return gestation_time == other.gestation_time && final_task_count == other.final_task_count;
   }
 
   bool operator<(const Phenotype & other) const {
-    return std::tie(gestation_time, final_task_count) < std::tie(other.gestation_time, other.final_task_count); 
+    return std::tie(gestation_time, final_task_count) < std::tie(other.gestation_time, other.final_task_count);
   }
 
   bool operator!=(const Phenotype & other) const {
-    return gestation_time != other.gestation_time || final_task_count != other.final_task_count; 
+    return gestation_time != other.gestation_time || final_task_count != other.final_task_count;
   }
 
 
   // bool operator<(Phenotype other) const {
-  //   return merit < other.merit;// && gestation_time < other.gestation_time; //&& final_task_count < other.final_task_count; 
+  //   return merit < other.merit;// && gestation_time < other.gestation_time; //&& final_task_count < other.final_task_count;
   // }
 
 
@@ -186,6 +186,8 @@ public:
 
   using systematics_t = emp::Systematics<cOrganism, std::string, emp::datastruct::mut_landscape_info<Phenotype>>;
   using taxon_t = emp::Taxon< std::string, emp::datastruct::mut_landscape_info<Phenotype>>;
+  emp::Ptr<taxon_t> mrca_ptr;
+  size_t mrca_changes=0;
 
   std::function<double(Avida::InstructionSequence&)> fit_fun;
   std::function<std::string(emp::Ptr<taxon_t>)> skel_fun;

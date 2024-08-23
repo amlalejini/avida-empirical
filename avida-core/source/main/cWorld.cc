@@ -218,7 +218,7 @@ bool cWorld::setup(World* new_world, cUserFeedback* feedback, const Apto::Map<Ap
     }
     success = false;
   }
-  
+
   // If there were errors loading at this point, it is perilous to try to go further (pop depends on an instruction set)
   if (!success) return success;
 
@@ -266,7 +266,7 @@ bool cWorld::setup(World* new_world, cUserFeedback* feedback, const Apto::Map<Ap
   // emp_assert(false);
   skel_fun = [this, null_inst](emp::Ptr<taxon_t> tax){
     // std::cout << "Skeletonizing" <<std::endl;
- 
+
     std::stringstream ss;
     Avida::InstructionSequence seq = tax->GetData().GetPhenotype().genotype;
     emp::vector<Avida::Instruction> skel = emp::Skeletonize(seq, null_inst, fit_fun);
@@ -291,19 +291,30 @@ bool cWorld::setup(World* new_world, cUserFeedback* feedback, const Apto::Map<Ap
       return emp::to_string(tax.GetData().GetPhenotype().genotype.AsString().GetCString());
     }, "sequence", "Avida instruction sequence for this taxon.");
 
+  systematics_manager->AddSnapshotFun(
+    [this](const taxon_t & tax) {
+      const size_t mrca_id = systematics_manager->GetMRCA()->GetID();
+      const size_t snap_id = tax.GetID();
+      return emp::to_string(mrca_id == snap_id);
+    },
+    "is_mrca",
+    "Is this taxon the current MRCA?"
+  );
+
   if (m_conf->OEE_RES.Get() != 0) {
     OEE_stats.New(systematics_manager, skel_fun, [null_inst](const std::string & org){return org.size();}, false, m_conf->WORLD_X.Get() * m_conf->WORLD_Y.Get() * 200000);
     OEE_stats->SetGenerationInterval(m_conf->FILTER_TIME.Get());
-    OEE_stats->SetResolution(m_conf->OEE_RES.Get());    
+    OEE_stats->SetResolution(m_conf->OEE_RES.Get());
   }
 
   OnBeforeRepro([this](int pos){
-    // std::cout << "Next parent is: " << pos; 
+    // std::cout << "Next parent is: " << pos;
     // if(systematics_manager->IsTaxonAt(pos)){
     //   std::cout << systematics_manager->GetTaxonAt(pos)->GetID();
-    // } 
-    systematics_manager->SetNextParent(pos);});
-  OnOffspringReady([this](cOrganism & org){ 
+    // }
+    systematics_manager->SetNextParent(pos);
+  });
+  OnOffspringReady([this](cOrganism & org){
     // std::cout << "on ready" << std::endl;
     systematics_manager->AddOrg(org, emp::WorldPosition(next_cell_id,0));
     emp::Ptr<taxon_t> tax = systematics_manager->GetMostRecent();
@@ -312,37 +323,48 @@ bool cWorld::setup(World* new_world, cUserFeedback* feedback, const Apto::Map<Ap
     }
     // std::cout << "Done with on ready" << std::endl;
   });
-  OnOrgDeath([this](int pos){ 
-    // std::cout << "on death " << std::endl; 
-    systematics_manager->RemoveOrgAfterRepro(emp::WorldPosition(pos, 0));});
+  OnOrgDeath([this](int pos){
+    // std::cout << "on death " << std::endl;
+    systematics_manager->RemoveOrgAfterRepro(emp::WorldPosition(pos, 0));
+  });
   if (m_conf->OEE_RES.Get() != 0) {
     OnUpdate([this](int ud){
       // std::cout << "On update" << std::endl;
-      if (std::round(GetStats().GetGeneration()) > latest_gen) { 
-        latest_gen = std::round(GetStats().GetGeneration()); 
-        OEE_stats->Update(latest_gen, GetStats().GetUpdate()); 
-        oee_file.Update(latest_gen); 
+      if (std::round(GetStats().GetGeneration()) > latest_gen) {
+        latest_gen = std::round(GetStats().GetGeneration());
+        OEE_stats->Update(latest_gen, GetStats().GetUpdate());
+        oee_file.Update(latest_gen);
       }
       // std::cout << "On update done" << std::endl;
     });
   }
   OnUpdate([this](int ud){
     // std::cout << "On update 2" << std::endl;
-    systematics_manager->Update(); 
+    systematics_manager->Update();
+    // did the mrca change? if so, record it
+    emp::Ptr<taxon_t> cur_taxa = systematics_manager->GetMRCA(m_conf->FORCE_MRCA_COMP.Get());
+    mrca_changes += (size_t)((cur_taxa != mrca_ptr) && (mrca_ptr != nullptr));
+    mrca_ptr = cur_taxa;
+    // if ((cur_taxa != mrca_ptr) && (mrca_ptr != nullptr)) {
+    //   ++mrca_changes;
+    //   mrca_ptr = cur_taxa;
+    // }
+
     // std::cout << "systematic man update done" << std::endl;
-    phylodiversity_file.Update(ud); 
+    phylodiversity_file.Update(ud);
     // std::cout << "Phylodiv file done" << std::endl;
-    lineage_file.Update(ud); 
+    lineage_file.Update(ud);
     // std::cout << "lin file done" << std::endl;
     dom_file.Update(ud);
     // std::cout << "On update 2 done" << std::endl;
     });
-  // --- bookmark ---
-  OnUpdate([this](int ud) { 
-    // std::cout << "On update3" << std::endl; 
-    if (GetStats().GetUpdate() % m_conf->PHYLOGENY_SNAPSHOT_RES.Get() == 0) { systematics_manager->Snapshot("phylogeny-snapshot-" + emp::to_string(GetStats().GetUpdate()) + ".csv" ); 
-    // std::cout << "End on update3" << std::endl; 
-    } });
+
+  OnUpdate([this](int ud) {
+    // std::cout << "On update3" << std::endl;
+    if (GetStats().GetUpdate() % m_conf->PHYLOGENY_SNAPSHOT_RES.Get() == 0) { systematics_manager->Snapshot("phylogeny-snapshot-" + emp::to_string(GetStats().GetUpdate()) + ".csv" );
+    // std::cout << "End on update3" << std::endl;
+    }
+  });
 
   std::function<int()> gen_fun = [this](){return std::round(GetStats().GetGeneration());};
   std::function<int()> update_fun = [this](){return GetStats().GetUpdate();};
@@ -371,7 +393,8 @@ bool cWorld::setup(World* new_world, cUserFeedback* feedback, const Apto::Map<Ap
   phylodiversity_file.template AddFun<size_t>( [this](){ return systematics_manager->GetNumRoots(); }, "num_roots", "Number of independent roots for phlogenies." );
   phylodiversity_file.template AddFun<int>(    [this](){ return systematics_manager->GetMRCADepth(); }, "mrca_depth", "Phylogenetic Depth of the Most Recent Common Ancestor (-1=none)." );
   phylodiversity_file.template AddFun<double>( [this](){ return systematics_manager->CalcDiversity(); }, "diversity", "Genotypic Diversity (entropy of taxa in population)." );
-
+  phylodiversity_file.template AddFun<size_t>( [this](){ return mrca_changes; }, "mrca_changes", "Number of times the MRCA has changed.");
+  phylodiversity_file.template AddFun<size_t>( [this](){ return systematics_manager->GetMRCA()->GetID(); }, "mrca_id", "ID of the MRCA");
 
   phylodiversity_file.PrintHeaderKeys();
   phylodiversity_file.SetTimingRepeat(m_conf->SYSTEMATICS_RES.Get());
@@ -398,7 +421,7 @@ bool cWorld::setup(World* new_world, cUserFeedback* feedback, const Apto::Map<Ap
   lineage_file.SetTimingRepeat(m_conf->SYSTEMATICS_RES.Get());
 
   dom_file.AddFun(update_fun, "update", "Update");
-  
+
   std::function<double(void)> get_score = [this]() {
     best_tax = emp::FindDominant(*systematics_manager);
     return best_tax->GetData().GetFitness();
