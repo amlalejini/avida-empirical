@@ -456,6 +456,18 @@ bool cWorld::setup(World* new_world, cUserFeedback* feedback, const Apto::Map<Ap
   //OEE_stats.SetDefaultFitnessFun(fit_fun);
   // std::cout << "initialized" << std::endl;
 
+  // ------
+  // first_time_completed_tasks
+  first_time_completed_tasks.clear();
+  first_time_completed_tasks.resize(m_env->GetNumTasks(), false);
+  all_tasks_completed = false;
+  first_time_task_locations.resize(m_env->GetNumTasks(), {-1, -1, -1});
+
+  // std::cout << "Num tasks" << m_env->GetNumTasks() << std::endl;
+  // for (size_t i = 0; i < m_env->GetNumTasks(); ++i) {
+  //   std::cout << " Task " << i << ": " << m_env->GetTask(i).GetName() << std::endl;
+  // }
+
   return success;
 }
 

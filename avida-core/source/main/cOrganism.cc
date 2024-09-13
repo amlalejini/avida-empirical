@@ -485,6 +485,32 @@ void cOrganism::doOutput(cAvidaContext& ctx,
                                                m_phenotype.GetCurRBinsAvail(), globalAndDeme_res_change,
                                                insts_triggered, is_parasite, context_phenotype);
 
+  // ------ Was this organism the first to complete a new task? ------
+  if (task_completed && !m_world->all_tasks_completed) {
+    const size_t num_tasks = m_world->GetEnvironment().GetNumTasks();
+    // Did organism complete a never-before-completed task?
+    const auto& org_tasks = m_phenotype.GetCurTaskCount();
+    emp_assert(org_tasks.GetSize() == num_tasks);
+    size_t total_completed = 0;
+    for (size_t i = 0; i < num_tasks; ++i) {
+      const bool task_completed = m_world->first_time_completed_tasks[i];
+      if (task_completed) {
+        ++total_completed;
+        continue;
+      } else if (org_tasks[i] > 0) {
+        // NOTE - Re-test organism to miminize chance of lucky io?
+        m_world->first_time_completed_tasks[i] = true;
+        // Location?
+        const int org_cell_id = GetCellID();
+        const int org_cell_x = m_interface->GetCellXPosition();
+        const int org_cell_y = m_interface->GetCellYPosition();
+        m_world->first_time_task_locations[i] = {org_cell_x, org_cell_y, org_cell_id};
+        ++total_completed;
+      }
+    }
+    m_world->all_tasks_completed = total_completed == num_tasks;
+  }
+
   // Handle merit increases that take the organism above it's current population merit
   if (m_world->GetConfig().MERIT_INC_APPLY_IMMEDIATE.Get()) {
     double cur_merit = m_phenotype.CalcCurrentMerit();
@@ -507,7 +533,7 @@ void cOrganism::doOutput(cAvidaContext& ctx,
   if (m_phenotype.GetMakeRandomResource()){
     //call the random resource update function
     m_interface->UpdateRandomResources(ctx, global_res_change);
-    
+
   }else{
     m_interface->UpdateResources(ctx, global_res_change);
   }
@@ -833,7 +859,7 @@ bool cOrganism::Divide_CheckViable(cAvidaContext& ctx)
   const int single_reaction = m_world->GetConfig().REQUIRE_SINGLE_REACTION.Get();
 
   const int max_task_count = m_world->GetConfig().MAX_UNIQUE_TASK_COUNT.Get();
-  
+
   if (single_reaction == 0 && required_reaction != -1 && m_phenotype.GetCurReactionCount()[required_reaction] == 0 && \
       m_phenotype.GetStolenReactionCount()[required_reaction] == 0)   {
     if (immunity_reaction == -1 || m_phenotype.GetCurReactionCount()[immunity_reaction] == 0) {
@@ -843,7 +869,7 @@ bool cOrganism::Divide_CheckViable(cAvidaContext& ctx)
     }
   }
 
-  
+
   if (max_task_count > 0) {
     int task_limit = max_task_count;
     Apto::Array<int> task_counts = m_phenotype.GetCurTaskCount();
@@ -851,22 +877,22 @@ bool cOrganism::Divide_CheckViable(cAvidaContext& ctx)
       if (task_counts[i] > 0)
         task_limit--;
     }
-    
+
     if (task_limit < 0) {
       Fault(FAULT_LOC_DIVIDE, FAULT_TYPE_ERROR,
             cStringUtil::Stringf("Organism performs more than MAX_TASK_COUNT tasks"));
       return false; //  (divide fails)
     }
- 
+
   }
-  
+
   if (single_reaction != 0) {
     int toFail = single_reaction;
     Apto::Array<int> reactionCounts = m_phenotype.GetCurReactionCount();
     for (int i=0; i<reactionCounts.GetSize() && toFail; i++) {
       if (reactionCounts[i] > 0) --toFail;
     }
-    
+
     if (toFail) {
 
       const Apto::Array<int>& stolenReactions = m_phenotype.GetStolenReactionCount();
