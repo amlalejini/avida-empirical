@@ -51,6 +51,10 @@
 #include "cUserFeedback.h"
 #include "cArgSchema.h"
 
+#include "io/File.hpp"
+#include "tools/string_utils.hpp"
+#include <string_view>
+
 #include <algorithm>
 #include <iterator>
 #include <map>
@@ -4482,6 +4486,80 @@ public:
   }
 };
 
+class cActionReconfigureCellConnectivity : public cAction
+{
+private:
+  cString m_filename;
+
+public:
+  cActionReconfigureCellConnectivity(cWorld* world, const cString& args, Feedback&) : cAction(world, args)
+  {
+    cString largs(args);
+    if (largs.GetSize()) m_filename = largs.PopWord();
+  }
+
+  static const cString GetDescription() { return "Arguments: <filename>"; }
+
+  void Process(cAvidaContext& ctx)
+  {
+    if (m_filename.GetSize() == 0) {
+      cerr << "error: no connection matrix file specified" << endl;
+      m_world->GetDriver().Abort(AbortCondition::IO_ERROR);
+    }
+    // (1) Disconnect all existing connections
+    for (size_t i = 0; i < m_world->GetPopulation().GetSize(); ++i) {
+      cPopulationCell& cur_cell = m_world->GetPopulation().GetCell(i);
+      tList<cPopulationCell>& conn_list = cur_cell.ConnectionList();
+      conn_list.Clear();
+    }
+    // (2) Load provided connections matrix file
+    std::string fname(m_filename.GetData());
+    emp::File conn_file(fname);
+    conn_file.RemoveWhitespace(); // Strip any extra lines
+    // -- Parse connections file --
+    emp::vector< emp::vector<bool> > connections_matrix(
+      conn_file.GetNumLines(),
+      emp::vector<bool>(conn_file.GetNumLines(), false)
+    );
+    // Check that connections matrix is same size as world
+    if (connections_matrix.size() != m_world->GetPopulation().GetSize()) {
+      cerr << "error: number of locations (" << connections_matrix.size()
+           << ") in connection matrix does not match world size ("
+           << m_world->GetPopulation().GetSize()
+           << ")" << std::endl;
+      m_world->GetDriver().Abort(AbortCondition::IO_ERROR);
+    }
+    for (size_t from_i = 0; from_i < conn_file.GetNumLines(); ++from_i) {
+      std::string_view line(conn_file[from_i]);
+      // Split current line
+      emp::vector<std::string> split_line = emp::slice(line, ',');
+      emp_assert(split_line.size() == connections_matrix.size());
+      // Connect appropriate cells
+      for (size_t to_i = 0; to_i < split_line.size(); ++to_i) {
+        // If no connection, skip.
+        if (split_line[to_i] == "0") continue;
+        // Make a connection. from_i => to_i
+        cPopulationCell& from_cell = m_world->GetPopulation().GetCell(from_i);
+        cPopulationCell& to_cell = m_world->GetPopulation().GetCell(to_i);
+        tList<cPopulationCell>& from_cell_conn_list = from_cell.ConnectionList();
+        from_cell_conn_list.PushRear(&to_cell);
+      }
+    }
+    // std::cout << "All connections (after reconfiguring): " << std::endl;
+    // for (size_t i = 0; i < m_world->GetPopulation().GetSize(); ++i) {
+    //   cPopulationCell& cur_cell = m_world->GetPopulation().GetCell(i);
+    //   std::cout << "  Cell ID (" << cur_cell.GetPosition().first << "," << cur_cell.GetPosition().second << "): ";
+    //   tList<cPopulationCell>& conn_list = cur_cell.ConnectionList();
+    //   for (size_t conn_i = 0; conn_i < conn_list.GetSize(); ++conn_i) {
+    //     const int x = conn_list.GetPos(conn_i)->GetPosition().first;
+    //     const int y = conn_list.GetPos(conn_i)->GetPosition().second;
+    //     std::cout << " (" << x << "," << y << ") ";
+    //   }
+    //   std::cout << std::endl;
+    // }
+  }
+};
+
 class cActionSwapCells : public cAction
 {
 private:
@@ -6247,6 +6325,7 @@ void RegisterPopulationActions(cActionLibrary* action_lib)
   action_lib->Register<cActionConnectCells>("ConnectCells");
   action_lib->Register<cActionDisconnectCells>("DisconnectCells");
   action_lib->Register<cActionDisconnectCellsAll>("DisconnectCellsAll");
+  action_lib->Register<cActionReconfigureCellConnectivity>("ReconfigureCellConnectivity");
   action_lib->Register<cActionSwapCells>("SwapCells");
   action_lib->Register<cActionSwapRandomCells>("SwapRandomCells");
 
