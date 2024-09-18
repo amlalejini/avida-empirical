@@ -4514,6 +4514,7 @@ public:
     }
     // (2) Load provided connections matrix file
     std::string fname(m_filename.GetData());
+    std::cout << "\nReconfiguring cell connectivity using: " << fname << std::endl;
     emp::File conn_file(fname);
     conn_file.RemoveWhitespace(); // Strip any extra lines
     // -- Parse connections file --
