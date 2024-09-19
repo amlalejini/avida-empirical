@@ -292,7 +292,10 @@ bool cWorld::setup(World* new_world, cUserFeedback* feedback, const Apto::Map<Ap
     }, "sequence", "Avida instruction sequence for this taxon.");
 
   systematics_manager->AddSnapshotFun(
-    [this](const taxon_t & tax) {
+    [this](const taxon_t & tax) -> std::string {
+      if (systematics_manager->GetMRCA() == nullptr) {
+        return "0";
+      }
       const size_t mrca_id = systematics_manager->GetMRCA()->GetID();
       const size_t snap_id = tax.GetID();
       return emp::to_string(mrca_id == snap_id);
@@ -384,7 +387,6 @@ bool cWorld::setup(World* new_world, cUserFeedback* feedback, const Apto::Map<Ap
   systematics_manager->AddPhylogeneticDiversityDataNode();
   phylodiversity_file.AddFun(update_fun, "update", "Update");
   phylodiversity_file.AddStats(*systematics_manager->GetDataNode("evolutionary_distinctiveness") , "evolutionary_distinctiveness", "evolutionary distinctiveness for a single update", true, true);
-  // phylodiversity_file.AddStats(*systematics_manager->GetDataNode("pairwise_distances"), "pairwise_distance", "pairwise distance for a single update", true, true);
   phylodiversity_file.AddCurrent(*systematics_manager->GetDataNode("phylogenetic_diversity"), "current_phylogenetic_diversity", "current phylogenetic_diversity", true, true);
 
   phylodiversity_file.template AddFun<size_t>( [this](){ return systematics_manager->GetNumActive(); }, "num_taxa", "Number of unique taxonomic groups currently active." );
@@ -394,7 +396,17 @@ bool cWorld::setup(World* new_world, cUserFeedback* feedback, const Apto::Map<Ap
   phylodiversity_file.template AddFun<int>(    [this](){ return systematics_manager->GetMRCADepth(); }, "mrca_depth", "Phylogenetic Depth of the Most Recent Common Ancestor (-1=none)." );
   phylodiversity_file.template AddFun<double>( [this](){ return systematics_manager->CalcDiversity(); }, "diversity", "Genotypic Diversity (entropy of taxa in population)." );
   phylodiversity_file.template AddFun<size_t>( [this](){ return mrca_changes; }, "mrca_changes", "Number of times the MRCA has changed.");
-  phylodiversity_file.template AddFun<size_t>( [this](){ return systematics_manager->GetMRCA()->GetID(); }, "mrca_id", "ID of the MRCA");
+  phylodiversity_file.template AddFun<int>(
+    [this]() -> int {
+      if (systematics_manager->GetMRCA() == nullptr) {
+        return -1;
+      } else {
+        return (int)systematics_manager->GetMRCA()->GetID();
+      }
+    },
+    "mrca_id",
+    "ID of the MRCA"
+  );
 
   phylodiversity_file.PrintHeaderKeys();
   phylodiversity_file.SetTimingRepeat(m_conf->SYSTEMATICS_RES.Get());
