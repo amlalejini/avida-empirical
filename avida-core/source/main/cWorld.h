@@ -192,6 +192,7 @@ public:
   emp::vector<bool> first_time_completed_tasks;
   emp::vector<std::array<int, 3>> first_time_task_locations; // Format: (x,y,nodeid)
   bool all_tasks_completed = false;
+  emp::vector<size_t> births_per_location;
 
   std::function<double(Avida::InstructionSequence&)> fit_fun;
   std::function<std::string(emp::Ptr<taxon_t>)> skel_fun;

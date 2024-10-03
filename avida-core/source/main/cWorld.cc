@@ -320,6 +320,9 @@ bool cWorld::setup(World* new_world, cUserFeedback* feedback, const Apto::Map<Ap
   OnOffspringReady([this](cOrganism & org){
     // std::cout << "on ready" << std::endl;
     systematics_manager->AddOrg(org, emp::WorldPosition(next_cell_id,0));
+    const size_t birth_loc = (size_t)next_cell_id;
+    emp_assert(birth_loc < m_pop->GetSize());
+    births_per_location[birth_loc] += 1;
     emp::Ptr<taxon_t> tax = systematics_manager->GetMostRecent();
     if (tax->GetData().GetPhenotype().gestation_time == -1) {
       eval_fun(tax, org);
@@ -474,6 +477,9 @@ bool cWorld::setup(World* new_world, cUserFeedback* feedback, const Apto::Map<Ap
   first_time_completed_tasks.resize(m_env->GetNumTasks(), false);
   all_tasks_completed = false;
   first_time_task_locations.resize(m_env->GetNumTasks(), {-1, -1, -1});
+
+  births_per_location.clear();
+  births_per_location.resize(m_pop->GetSize(), 0);
 
   // std::cout << "Num tasks" << m_env->GetNumTasks() << std::endl;
   // for (size_t i = 0; i < m_env->GetNumTasks(); ++i) {

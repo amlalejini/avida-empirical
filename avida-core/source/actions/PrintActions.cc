@@ -3922,6 +3922,49 @@ public:
   }
 };
 
+
+/* Dumps the birth count for each location thus far. */
+class cActionDumpBirthCountsPerLocation : public cAction
+{
+private:
+  cString m_filename;
+
+public:
+  cActionDumpBirthCountsPerLocation(cWorld* world, const cString& args, Feedback&) : cAction(world, args), m_filename("")
+  {
+    cString largs(args);
+    if (largs.GetSize()) m_filename = largs.PopWord();
+  }
+  static const cString GetDescription() { return "Arguments: [string fname='']"; }
+  void Process(cAvidaContext&)
+  {
+
+    cString filename(m_filename);
+    if (filename == "") {
+      filename.Set("loc_birth_counts.csv");
+    }
+    Avida::Output::FilePtr df = Avida::Output::File::CreateWithPath(
+      m_world->GetNewWorld(),
+      (const char*)filename
+    );
+    ofstream& fp = df->OFStream();
+    fp << "loc_x,loc_y,loc_id,births";
+    auto& pop = m_world->GetPopulation();
+    const auto& births_per_loc = m_world->births_per_location;
+    for (size_t loc_id = 0; loc_id < births_per_loc.size(); ++loc_id) {
+      fp << "\n";
+      const auto& cell = pop.GetCell(loc_id);
+      const int x = cell.GetPositionX();
+      const int y = cell.GetPositionY();
+      fp << x << ",";
+      fp << y << ",";
+      fp << loc_id << ",";
+      fp << births_per_loc[loc_id];
+    }
+  }
+};
+
+
 /* Dumps the task grid of the last task performed by each organism. */
 class cActionDumpLastTaskGrid : public cAction
 {
@@ -5735,6 +5778,7 @@ void RegisterPrintActions(cActionLibrary* action_lib)
   action_lib->Register<cActionDumpTargetGrid>("DumpTargetGrid");
   action_lib->Register<cActionDumpMaxResGrid>("DumpMaxResGrid");
   action_lib->Register<cActionDumpFirstTaskLocations>("DumpFirstTaskLocations");
+  action_lib->Register<cActionDumpBirthCountsPerLocation>("DumpBirthCountsPerLocation");
   action_lib->Register<cActionDumpTaskGrid>("DumpTaskGrid");
   action_lib->Register<cActionDumpLastTaskGrid>("DumpLastTaskGrid");
   action_lib->Register<cActionDumpHostTaskGrid>("DumpHostTaskGrid");

@@ -57,7 +57,7 @@ private:
   Apto::Array<int> m_inputs;                 // Environmental Inputs...
 
   int m_cell_id;           // Unique id for position of cell in population.
-  int m_deme_id;           // ID of the deme that this cell is part of.  
+  int m_deme_id;           // ID of the deme that this cell is part of.
 
   struct {
     int contents;
@@ -79,8 +79,8 @@ private:
   // @WRE: Statistic for movement
   int m_visits; // The number of times Avidians move into the cell
 
-  void InsertOrganism(cOrganism* new_org, cAvidaContext& ctx); 
-  cOrganism* RemoveOrganism(cAvidaContext& ctx); 
+  void InsertOrganism(cOrganism* new_org, cAvidaContext& ctx);
+  cOrganism* RemoveOrganism(cAvidaContext& ctx);
 
 
 public:
@@ -114,6 +114,8 @@ public:
   int GetFacedDir(); // Returns the human interpretable facing of this org.
   inline void GetPosition(int& x, int& y) const { x = m_x; y = m_y; } // Retrieves the position (x,y) coordinates of this cell.
   inline std::pair<int,int> GetPosition() const { return std::make_pair(m_x,m_y); }
+  inline int GetPositionX() const { return m_x; }
+  inline int GetPositionY() const { return m_y; }
   inline int GetVisits() { return m_visits; } // @WRE: Retrieves the number of visits for this cell.
   inline void IncVisits() { m_visits++; } // @WRE: Increments the visit count for a cell
   inline const cMutationRates& MutationRates() const { assert(m_mut_rates); return *m_mut_rates; }
@@ -142,9 +144,9 @@ public:
 
   inline bool IsOccupied() const { return m_organism != NULL; }
 
-  double UptakeCellEnergy(double frac_to_uptake, cAvidaContext& ctx); 
-  
-// -------- Avatar support -------- 
+  double UptakeCellEnergy(double frac_to_uptake, cAvidaContext& ctx);
+
+// -------- Avatar support --------
 private:
   Apto::Array<cOrganism*, Apto::Smart>  m_av_prey;
   Apto::Array<cOrganism*, Apto::Smart>  m_av_pred;
@@ -172,7 +174,7 @@ public:
   Apto::Array<cOrganism*> GetCellOutputAVs();
   Apto::Array<cOrganism*> GetCellAVs();
 
-// -------- Neural support -------- 
+// -------- Neural support --------
 private:
   bool m_can_input;
   bool m_can_output;
