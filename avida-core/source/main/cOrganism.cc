@@ -487,6 +487,7 @@ void cOrganism::doOutput(cAvidaContext& ctx,
 
   // ------ Was this organism the first to complete a new task? ------
   if (task_completed && !m_world->all_tasks_completed) {
+    const int org_cell_id = GetCellID();
     const size_t num_tasks = m_world->GetEnvironment().GetNumTasks();
     // Did organism complete a never-before-completed task?
     const auto& org_tasks = m_phenotype.GetCurTaskCount();
@@ -497,11 +498,10 @@ void cOrganism::doOutput(cAvidaContext& ctx,
       if (task_completed) {
         ++total_completed;
         continue;
-      } else if (org_tasks[i] > 0) {
+      } else if (org_tasks[i] > 0 && org_cell_id != -1) {
         // NOTE - Re-test organism to miminize chance of lucky io?
         m_world->first_time_completed_tasks[i] = true;
         // Location?
-        const int org_cell_id = GetCellID();
         const int org_cell_x = m_interface->GetCellXPosition();
         const int org_cell_y = m_interface->GetCellYPosition();
         m_world->first_time_task_locations[i] = {org_cell_x, org_cell_y, org_cell_id};
