@@ -476,7 +476,7 @@ bool cWorld::setup(World* new_world, cUserFeedback* feedback, const Apto::Map<Ap
   first_time_completed_tasks.clear();
   first_time_completed_tasks.resize(m_env->GetNumTasks(), false);
   all_tasks_completed = false;
-  first_time_task_locations.resize(m_env->GetNumTasks(), {-1, -1, -1});
+  first_time_task_locations.resize(m_env->GetNumTasks(), {-1, -1, -1, -1});
 
   births_per_location.clear();
   births_per_location.resize(m_pop->GetSize(), 0);

@@ -504,7 +504,8 @@ void cOrganism::doOutput(cAvidaContext& ctx,
         // Location?
         const int org_cell_x = m_interface->GetCellXPosition();
         const int org_cell_y = m_interface->GetCellYPosition();
-        m_world->first_time_task_locations[i] = {org_cell_x, org_cell_y, org_cell_id};
+        const int update = m_world->GetStats().GetUpdate();
+        m_world->first_time_task_locations[i] = {org_cell_x, org_cell_y, org_cell_id, update};
         ++total_completed;
       }
     }

@@ -3896,18 +3896,13 @@ public:
   static const cString GetDescription() { return "Arguments: [string fname='']"; }
   void Process(cAvidaContext&)
   {
-
-    // first_time_completed_tasks.clear();
-    // first_time_completed_tasks.resize(m_env->GetNumTasks(), false);
-    // all_tasks_completed = false;
-    // first_time_task_locations.resize(m_env->GetNumTasks(), {-1, -1, -1});
     cString filename(m_filename);
     if (filename == "") {
       filename.Set("first_task_locs.csv");
     }
     Avida::Output::FilePtr df = Avida::Output::File::CreateWithPath(m_world->GetNewWorld(), (const char*)filename);
     ofstream& fp = df->OFStream();
-    fp << "task_name,task_id,completed,loc_x,loc_y,loc_id";
+    fp << "task_name,task_id,completed,loc_x,loc_y,loc_id,update";
     const auto& env = m_world->GetEnvironment();
     const size_t num_tasks = env.GetNumTasks();
     for (size_t i = 0; i < num_tasks; ++i) {
@@ -3917,7 +3912,8 @@ public:
       fp << m_world->first_time_completed_tasks[i] << ",";
       fp << m_world->first_time_task_locations[i][0] << ","; // x
       fp << m_world->first_time_task_locations[i][1] << ","; // y
-      fp << m_world->first_time_task_locations[i][2]; // location id
+      fp << m_world->first_time_task_locations[i][2] << ","; // location id
+      fp << m_world->first_time_task_locations[i][3];        // update
     }
   }
 };
