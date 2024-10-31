@@ -348,13 +348,18 @@ bool cWorld::setup(World* new_world, cUserFeedback* feedback, const Apto::Map<Ap
     // std::cout << "On update 2" << std::endl;
     systematics_manager->Update();
     // did the mrca change? if so, record it
-    emp::Ptr<taxon_t> cur_taxa = systematics_manager->GetMRCA(m_conf->FORCE_MRCA_COMP.Get());
-    mrca_changes += (size_t)((cur_taxa != mrca_ptr) && (mrca_ptr != nullptr));
-    mrca_ptr = cur_taxa;
-    // if ((cur_taxa != mrca_ptr) && (mrca_ptr != nullptr)) {
-    //   ++mrca_changes;
-    //   mrca_ptr = cur_taxa;
-    // }
+    emp::Ptr<taxon_t> cur_taxa = systematics_manager->GetMRCA();
+    if (cur_taxa != nullptr && mrca_ptr != nullptr) {
+      // If current mrca and previous mrca are both valid taxa
+      mrca_changes += (size_t)(cur_taxa->GetID() != mrca_ptr->GetID());
+      mrca_ptr = cur_taxa;
+    } else if (cur_taxa != nullptr) {
+      // If current mrca is a valid taxon but prev mrca is nullptr,
+      // we have a new mrca (but we don't want to check ids)
+      ++mrca_changes;
+      mrca_ptr = cur_taxa;
+    }
+    // Otherwise, no change in mrca!
 
     // std::cout << "systematic man update done" << std::endl;
     phylodiversity_file.Update(ud);
