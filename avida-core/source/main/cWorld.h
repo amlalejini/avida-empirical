@@ -188,6 +188,7 @@ public:
   using systematics_t = emp::Systematics<cOrganism, org_info_t, emp::datastruct::mut_landscape_info<Phenotype>>;
   using taxon_t = emp::Taxon< org_info_t, emp::datastruct::mut_landscape_info<Phenotype>>;
   emp::Ptr<taxon_t> mrca_ptr;
+  int avida_coalescent_depth;
   size_t mrca_changes=0;
 
   emp::vector<bool> first_time_completed_tasks;

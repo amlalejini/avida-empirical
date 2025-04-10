@@ -29,6 +29,7 @@
 #include "avida/output/Manager.h"
 #include "avida/systematics/Arbiter.h"
 #include "avida/systematics/Manager.h"
+#include "avida/data/Package.h"
 
 #include "avida/private/systematics/GenotypeArbiter.h"
 
@@ -195,11 +196,9 @@ bool cWorld::setup(World* new_world, cUserFeedback* feedback, const Apto::Map<Ap
   systematics->AttachTo(new_world);
   systematics->RegisterArbiter(Systematics::ArbiterPtr(new Systematics::GenotypeArbiter(new_world, "genotype", m_conf->THRESHOLD.Get(), m_conf->DISABLE_GENOTYPE_CLASSIFICATION.Get())));
 
-
   // Setup Stats Object
   m_stats = Apto::SmartPtr<cStats, Apto::InternalRCObject>(new cStats(this));
   Data::Manager::Of(m_new_world)->AttachRecorder(m_stats);
-
 
   // Initialize the hardware manager, loading all of the instruction sets
   m_hw_mgr = new cHardwareManager(this);
@@ -257,6 +256,12 @@ bool cWorld::setup(World* new_world, cUserFeedback* feedback, const Apto::Map<Ap
     /*
     bool store_active=true, bool store_ancestors=true, bool store_all=false, bool store_pos=true
     */
+
+  // Get initial coalescent depth
+  Systematics::GenotypeArbiterPtr gen_arb;
+  gen_arb.DynamicCastFrom(Systematics::Manager::Of(m_new_world)->ArbiterForRole("genotype"));
+  avida_coalescent_depth = gen_arb->m_coalescent_depth;
+
   systematics_manager.New(
     [](cOrganism & org){
       return org.GetID();
@@ -295,20 +300,31 @@ bool cWorld::setup(World* new_world, cUserFeedback* feedback, const Apto::Map<Ap
   });
 
   OnUpdate([this](int ud){
-    // std::cout << "On update 2" << std::endl;
     systematics_manager->Update();
-    // did the mrca change? if so, record it
-    emp::Ptr<taxon_t> cur_taxa = systematics_manager->GetMRCA();
-    if (cur_taxa != nullptr && mrca_ptr != nullptr) {
-      // If current mrca and previous mrca are both valid taxa
-      mrca_changes += (size_t)(cur_taxa->GetID() != mrca_ptr->GetID());
-      mrca_ptr = cur_taxa;
-    } else if (cur_taxa != nullptr) {
-      // If current mrca is a valid taxon but prev mrca is nullptr,
-      // we have a new mrca (but we don't want to check ids)
-      ++mrca_changes;
-      mrca_ptr = cur_taxa;
+    // If we're tracking ancestors with empirical's phylogeny tracker,
+    // use it to determine mrca changes
+    // Otherwise, dig it out of Avida's genotype arbiter
+    if (m_conf->EMP_PHYLO_STORE_ANCESTORS.Get()) {
+      emp::Ptr<taxon_t> cur_taxa = systematics_manager->GetMRCA();
+      if (cur_taxa != nullptr && mrca_ptr != nullptr) {
+        // If current mrca and previous mrca are both valid taxa
+        mrca_changes += (size_t)(cur_taxa->GetID() != mrca_ptr->GetID());
+        mrca_ptr = cur_taxa;
+      } else if (cur_taxa != nullptr) {
+        // If current mrca is a valid taxon but prev mrca is nullptr,
+        // we have a new mrca (but we don't want to check ids)
+        ++mrca_changes;
+        mrca_ptr = cur_taxa;
+      }
+    } else {
+      Systematics::GenotypeArbiterPtr gen_arb;
+      gen_arb.DynamicCastFrom(Systematics::Manager::Of(m_new_world)->ArbiterForRole("genotype"));
+      mrca_changes += (bool)(avida_coalescent_depth != gen_arb->m_coalescent_depth);
+      avida_coalescent_depth = gen_arb->m_coalescent_depth;
+      std::cout << "  MRCA Changes = " << mrca_changes << std::endl;
+      std::cout << " avida coalescent depth = " << avida_coalescent_depth << std::endl;
     }
+
     // Otherwise, no change in mrca!
     phylodiversity_file.Update(ud);
   });
@@ -327,28 +343,33 @@ bool cWorld::setup(World* new_world, cUserFeedback* feedback, const Apto::Map<Ap
   systematics_manager->AddEvolutionaryDistinctivenessDataNode();
   systematics_manager->AddPairwiseDistanceDataNode();
   systematics_manager->AddPhylogeneticDiversityDataNode();
-  phylodiversity_file.AddFun(update_fun, "update", "Update");
-  phylodiversity_file.AddStats(*systematics_manager->GetDataNode("evolutionary_distinctiveness") , "evolutionary_distinctiveness", "evolutionary distinctiveness for a single update", true, true);
-  phylodiversity_file.AddCurrent(*systematics_manager->GetDataNode("phylogenetic_diversity"), "current_phylogenetic_diversity", "current phylogenetic_diversity", true, true);
 
-  phylodiversity_file.template AddFun<size_t>( [this](){ return systematics_manager->GetNumActive(); }, "num_taxa", "Number of unique taxonomic groups currently active." );
-  phylodiversity_file.template AddFun<size_t>( [this](){ return systematics_manager->GetTotalOrgs(); }, "total_orgs", "Number of organisms tracked." );
-  phylodiversity_file.template AddFun<double>( [this](){ return systematics_manager->GetAveDepth(); }, "ave_depth", "Average Phylogenetic Depth of Organisms." );
-  phylodiversity_file.template AddFun<size_t>( [this](){ return systematics_manager->GetNumRoots(); }, "num_roots", "Number of independent roots for phlogenies." );
-  phylodiversity_file.template AddFun<int>(    [this](){ return systematics_manager->GetMRCADepth(); }, "mrca_depth", "Phylogenetic Depth of the Most Recent Common Ancestor (-1=none)." );
-  phylodiversity_file.template AddFun<double>( [this](){ return systematics_manager->CalcDiversity(); }, "diversity", "Genotypic Diversity (entropy of taxa in population)." );
+  phylodiversity_file.AddFun(update_fun, "update", "Update");
+
+  // Output most phylodiversity stats only if tracking ancestors
+  if (m_conf->EMP_PHYLO_STORE_ANCESTORS.Get()) {
+    phylodiversity_file.AddStats(*systematics_manager->GetDataNode("evolutionary_distinctiveness") , "evolutionary_distinctiveness", "evolutionary distinctiveness for a single update", true, true);
+    phylodiversity_file.AddCurrent(*systematics_manager->GetDataNode("phylogenetic_diversity"), "current_phylogenetic_diversity", "current phylogenetic_diversity", true, true);
+    phylodiversity_file.template AddFun<size_t>( [this](){ return systematics_manager->GetNumActive(); }, "num_taxa", "Number of unique taxonomic groups currently active." );
+    phylodiversity_file.template AddFun<size_t>( [this](){ return systematics_manager->GetTotalOrgs(); }, "total_orgs", "Number of organisms tracked." );
+    phylodiversity_file.template AddFun<double>( [this](){ return systematics_manager->GetAveDepth(); }, "ave_depth", "Average Phylogenetic Depth of Organisms." );
+    phylodiversity_file.template AddFun<size_t>( [this](){ return systematics_manager->GetNumRoots(); }, "num_roots", "Number of independent roots for phlogenies." );
+    phylodiversity_file.template AddFun<int>(    [this](){ return systematics_manager->GetMRCADepth(); }, "mrca_depth", "Phylogenetic Depth of the Most Recent Common Ancestor (-1=none)." );
+    phylodiversity_file.template AddFun<double>( [this](){ return systematics_manager->CalcDiversity(); }, "diversity", "Genotypic Diversity (entropy of taxa in population)." );
+    phylodiversity_file.template AddFun<int>(
+      [this]() -> int {
+        if (systematics_manager->GetMRCA() == nullptr) {
+          return -1;
+        } else {
+          return (int)systematics_manager->GetMRCA()->GetID();
+        }
+      },
+      "mrca_id",
+      "ID of the MRCA"
+    );
+  }
+
   phylodiversity_file.template AddFun<size_t>( [this](){ return mrca_changes; }, "mrca_changes", "Number of times the MRCA has changed.");
-  phylodiversity_file.template AddFun<int>(
-    [this]() -> int {
-      if (systematics_manager->GetMRCA() == nullptr) {
-        return -1;
-      } else {
-        return (int)systematics_manager->GetMRCA()->GetID();
-      }
-    },
-    "mrca_id",
-    "ID of the MRCA"
-  );
 
   phylodiversity_file.PrintHeaderKeys();
   phylodiversity_file.SetTimingRepeat(m_conf->SYSTEMATICS_RES.Get());
