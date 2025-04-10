@@ -253,13 +253,19 @@ bool cWorld::setup(World* new_world, cUserFeedback* feedback, const Apto::Map<Ap
   }
 
 
-  // std::cout << "About to make sys" << std::endl;
+    // std::cout << "About to make sys" << std::endl;
+    /*
+    bool store_active=true, bool store_ancestors=true, bool store_all=false, bool store_pos=true
+    */
   systematics_manager.New(
     [](cOrganism & org){
       return org.GetID();
-    }
+    },
+    true, // store_active
+    m_conf->EMP_PHYLO_STORE_ANCESTORS.Get(), // store_ancestors
+    false, // store_all
+    true   // store_pos
   );
-
   systematics_manager->PrintStatus();
 
   systematics_manager->AddSnapshotFun(
