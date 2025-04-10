@@ -101,8 +101,6 @@ cWorld::cWorld(cAvidaConfig* cfg, const cString& wd)
       tax->GetData().RecordPhenotype(p);
    };
 
-
-   // OnUpdate([](int update){std::cout << update << " it works!" << std::endl;});
 }
 
 cWorld* cWorld::Initialize(cAvidaConfig* cfg, const cString& working_dir, World* new_world, cUserFeedback* feedback, const Apto::Map<Apto::String, Apto::String>* mappings)
@@ -254,42 +252,15 @@ bool cWorld::setup(World* new_world, cUserFeedback* feedback, const Apto::Map<Ap
     success = false;
   }
 
-  // std::cout << "startging setup" << std::endl;
-  // lineageM.Setup(this);
-  // std::cout << "lineage setup" << std::endl;
-  //OEE_stats.Setup(this);
-  // std::cout << "Stats set up" << std::endl;
-  // std::cout << this->GetHardwareManager().GetNumInstSets() << std::endl;
-  // std::cout << "test" << std::endl;
 
-  // std::cout << "Got hardware manager" << std::endl;
-  // emp_assert(false);
-  skel_fun = [this, null_inst](emp::Ptr<taxon_t> tax){
-    // std::cout << "Skeletonizing" <<std::endl;
-
-    std::stringstream ss;
-    Avida::InstructionSequence seq = tax->GetData().GetPhenotype().genotype;
-    emp::vector<Avida::Instruction> skel = emp::Skeletonize(seq, null_inst, fit_fun);
-    for (auto inst : skel) {
-      ss << inst.GetSymbol();
-    }
-    return ss.str();
-  };
   // std::cout << "About to make sys" << std::endl;
-  if (m_conf->TRACK_INDIVIDUALS.Get()) {
-    systematics_manager.New([](cOrganism & org){return emp::to_string(org.GetID());});
-  } else {
-    systematics_manager.New([](cOrganism & org){
-      ConstInstructionSequencePtr seq;
-      seq.DynamicCastFrom(org.GetGenome().Representation());
+  systematics_manager.New(
+    [](cOrganism & org){
+      return org.GetID();
+    }
+  );
 
-      return Avida::InstructionSequence(*seq).AsString().GetCString();
-    });
-  }
   systematics_manager->PrintStatus();
-  systematics_manager->AddSnapshotFun([](const taxon_t & tax) {
-      return emp::to_string(tax.GetData().GetPhenotype().genotype.AsString().GetCString());
-    }, "sequence", "Avida instruction sequence for this taxon.");
 
   systematics_manager->AddSnapshotFun(
     [this](const taxon_t & tax) -> std::string {
@@ -304,46 +275,19 @@ bool cWorld::setup(World* new_world, cUserFeedback* feedback, const Apto::Map<Ap
     "Is this taxon the current MRCA?"
   );
 
-  if (m_conf->OEE_RES.Get() != 0) {
-    OEE_stats.New(systematics_manager, skel_fun, [null_inst](const std::string & org){return org.size();}, false, m_conf->WORLD_X.Get() * m_conf->WORLD_Y.Get() * 200000);
-    OEE_stats->SetGenerationInterval(m_conf->FILTER_TIME.Get());
-    OEE_stats->SetResolution(m_conf->OEE_RES.Get());
-  }
-
   OnBeforeRepro([this](int pos){
-    // std::cout << "Next parent is: " << pos;
-    // if(systematics_manager->IsTaxonAt(pos)){
-    //   std::cout << systematics_manager->GetTaxonAt(pos)->GetID();
-    // }
     systematics_manager->SetNextParent(pos);
   });
   OnOffspringReady([this](cOrganism & org){
-    // std::cout << "on ready" << std::endl;
     systematics_manager->AddOrg(org, emp::WorldPosition(next_cell_id,0));
     const size_t birth_loc = (size_t)next_cell_id;
     emp_assert(birth_loc < m_pop->GetSize());
     births_per_location[birth_loc] += 1;
-    emp::Ptr<taxon_t> tax = systematics_manager->GetMostRecent();
-    if (tax->GetData().GetPhenotype().gestation_time == -1) {
-      eval_fun(tax, org);
-    }
-    // std::cout << "Done with on ready" << std::endl;
   });
   OnOrgDeath([this](int pos){
-    // std::cout << "on death " << std::endl;
     systematics_manager->RemoveOrgAfterRepro(emp::WorldPosition(pos, 0));
   });
-  if (m_conf->OEE_RES.Get() != 0) {
-    OnUpdate([this](int ud){
-      // std::cout << "On update" << std::endl;
-      if (std::round(GetStats().GetGeneration()) > latest_gen) {
-        latest_gen = std::round(GetStats().GetGeneration());
-        OEE_stats->Update(latest_gen, GetStats().GetUpdate());
-        oee_file.Update(latest_gen);
-      }
-      // std::cout << "On update done" << std::endl;
-    });
-  }
+
   OnUpdate([this](int ud){
     // std::cout << "On update 2" << std::endl;
     systematics_manager->Update();
@@ -360,35 +304,19 @@ bool cWorld::setup(World* new_world, cUserFeedback* feedback, const Apto::Map<Ap
       mrca_ptr = cur_taxa;
     }
     // Otherwise, no change in mrca!
-
-    // std::cout << "systematic man update done" << std::endl;
     phylodiversity_file.Update(ud);
-    // std::cout << "Phylodiv file done" << std::endl;
-    lineage_file.Update(ud);
-    // std::cout << "lin file done" << std::endl;
-    dom_file.Update(ud);
-    // std::cout << "On update 2 done" << std::endl;
-    });
+  });
 
   OnUpdate([this](int ud) {
-    // std::cout << "On update3" << std::endl;
-    if (GetStats().GetUpdate() % m_conf->PHYLOGENY_SNAPSHOT_RES.Get() == 0) { systematics_manager->Snapshot("phylogeny-snapshot-" + emp::to_string(GetStats().GetUpdate()) + ".csv" );
-    // std::cout << "End on update3" << std::endl;
+    if (GetStats().GetUpdate() % m_conf->PHYLOGENY_SNAPSHOT_RES.Get() == 0) {
+      systematics_manager->Snapshot(
+        "phylogeny-snapshot-" + emp::to_string(GetStats().GetUpdate()) + ".csv"
+      );
     }
   });
 
-  std::function<int()> gen_fun = [this](){return std::round(GetStats().GetGeneration());};
-  std::function<int()> update_fun = [this](){return GetStats().GetUpdate();};
-  // std::cout << " Setupp output" << std::endl;
-  if (m_conf->OEE_RES.Get() != 0) {
-    oee_file.AddFun(gen_fun, "generation", "Generation");
-    oee_file.AddCurrent(*OEE_stats->GetDataNode("change"), "change", "change potential");
-    oee_file.AddCurrent(*OEE_stats->GetDataNode("novelty"), "novelty", "novelty potential");
-    oee_file.AddCurrent(*OEE_stats->GetDataNode("diversity"), "ecology", "ecology potential");
-    oee_file.AddCurrent(*OEE_stats->GetDataNode("complexity"), "complexity", "complexity potential");
-    oee_file.PrintHeaderKeys();
-    oee_file.SetTimingRepeat(m_conf->OEE_RES.Get());
-  }
+  std::function<int()> gen_fun = [this](){ return std::round(GetStats().GetGeneration()); };
+  std::function<int()> update_fun = [this](){ return GetStats().GetUpdate(); };
 
   systematics_manager->AddEvolutionaryDistinctivenessDataNode();
   systematics_manager->AddPairwiseDistanceDataNode();
@@ -419,63 +347,6 @@ bool cWorld::setup(World* new_world, cUserFeedback* feedback, const Apto::Map<Ap
   phylodiversity_file.PrintHeaderKeys();
   phylodiversity_file.SetTimingRepeat(m_conf->SYSTEMATICS_RES.Get());
 
-  emp::vector<std::string> mut_types = {"substitution"};
-
-  for (size_t i = 0; i < mut_types.size(); i++) {
-      systematics_manager->AddMutationCountDataNode(mut_types[i]+"_mut_count", mut_types[i]);
-  }
-
-  systematics_manager->AddDeleteriousStepDataNode();
-  systematics_manager->AddVolatilityDataNode();
-  systematics_manager->AddUniqueTaxaDataNode();
-
-  lineage_file.AddFun(update_fun, "update", "Update");
-  for (size_t i = 0; i < mut_types.size(); i++) {
-      lineage_file.AddStats(*systematics_manager->GetDataNode(mut_types[i]+"_mut_count"), mut_types[i] + "_mutations_on_lineage", "counts of" + mut_types[i] + "mutations along each lineage", true, true);
-  }
-
-  lineage_file.AddStats(*systematics_manager->GetDataNode("deleterious_steps"), "deleterious_steps", "counts of deleterious steps along each lineage", true, true);
-  lineage_file.AddStats(*systematics_manager->GetDataNode("volatility"), "taxon_volatility", "counts of changes in taxon along each lineage", true, true);
-  lineage_file.AddStats(*systematics_manager->GetDataNode("unique_taxa"), "unique_taxa", "counts of unique taxa along each lineage", true, true);
-  lineage_file.PrintHeaderKeys();
-  lineage_file.SetTimingRepeat(m_conf->SYSTEMATICS_RES.Get());
-
-  dom_file.AddFun(update_fun, "update", "Update");
-
-  std::function<double(void)> get_score = [this]() {
-    best_tax = emp::FindDominant(*systematics_manager);
-    return best_tax->GetData().GetFitness();
-  };
-
-  dom_file.AddFun(get_score, "score", "get best phenotype score from this update");
-
-  std::function<int(void)> dom_lin_len = [this](){
-    return emp::LineageLength(best_tax);
-  };
-  std::function<int(void)> dom_del_step = [this](){
-    return emp::CountDeleteriousSteps(best_tax);
-  };
-  std::function<size_t(void)> dom_phen_vol = [this](){
-    return emp::CountPhenotypeChanges(best_tax);
-  };
-  std::function<size_t(void)> dom_unique_phen = [this](){
-    return emp::CountUniquePhenotypes(best_tax);
-  };
-
-  // file.AddFun(dom_mut_count, "dominant_mutation_count", "sum of mutations along dominant organism's lineage");
-  dom_file.AddFun(dom_lin_len, "dominant_lineage_length", "count of changes in genotype in the dominant organism's lineage.");
-  dom_file.AddFun(dom_del_step, "dominant_deleterious_steps", "count of deleterious steps along dominant organism's lineage");
-  dom_file.AddFun(dom_phen_vol, "dominant_phenotypic_volatility", "count of changes in phenotype along dominant organism's lineage");
-  dom_file.AddFun(dom_unique_phen, "dominant_unique_phenotypes", "count of unique phenotypes along dominant organism's lineage");
-  dom_file.PrintHeaderKeys();
-  dom_file.SetTimingRepeat(m_conf->SYSTEMATICS_RES.Get());
-
-  // std::cout << "Null set" << std::endl;
-  //const char * inst_set_name = (const char*)is.GetInstSetName();
-  //cHardwareManager::SetupPropertyMap(props, inst_set_name);
-  //OEE_stats.SetDefaultFitnessFun(fit_fun);
-  // std::cout << "initialized" << std::endl;
-
   // ------
   // first_time_completed_tasks
   first_time_completed_tasks.clear();
@@ -485,11 +356,6 @@ bool cWorld::setup(World* new_world, cUserFeedback* feedback, const Apto::Map<Ap
 
   births_per_location.clear();
   births_per_location.resize(m_pop->GetSize(), 0);
-
-  // std::cout << "Num tasks" << m_env->GetNumTasks() << std::endl;
-  // for (size_t i = 0; i < m_env->GetNumTasks(); ++i) {
-  //   std::cout << " Task " << i << ": " << m_env->GetTask(i).GetName() << std::endl;
-  // }
 
   return success;
 }

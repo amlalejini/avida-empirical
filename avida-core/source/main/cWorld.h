@@ -184,8 +184,9 @@ public:
   emp::DataFile lineage_file;
   emp::DataFile dom_file;
 
-  using systematics_t = emp::Systematics<cOrganism, std::string, emp::datastruct::mut_landscape_info<Phenotype>>;
-  using taxon_t = emp::Taxon< std::string, emp::datastruct::mut_landscape_info<Phenotype>>;
+  using org_info_t = int;
+  using systematics_t = emp::Systematics<cOrganism, org_info_t, emp::datastruct::mut_landscape_info<Phenotype>>;
+  using taxon_t = emp::Taxon< org_info_t, emp::datastruct::mut_landscape_info<Phenotype>>;
   emp::Ptr<taxon_t> mrca_ptr;
   size_t mrca_changes=0;
 
