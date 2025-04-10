@@ -321,8 +321,6 @@ bool cWorld::setup(World* new_world, cUserFeedback* feedback, const Apto::Map<Ap
       gen_arb.DynamicCastFrom(Systematics::Manager::Of(m_new_world)->ArbiterForRole("genotype"));
       mrca_changes += (bool)(avida_coalescent_depth != gen_arb->m_coalescent_depth);
       avida_coalescent_depth = gen_arb->m_coalescent_depth;
-      std::cout << "  MRCA Changes = " << mrca_changes << std::endl;
-      std::cout << " avida coalescent depth = " << avida_coalescent_depth << std::endl;
     }
 
     // Otherwise, no change in mrca!
