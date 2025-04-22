@@ -290,6 +290,7 @@ public:
   CONFIG_ADD_VAR(PHYLOGENY_SNAPSHOT_RES, int, 1000, "How often should we print phylogeny stats?");
   CONFIG_ADD_VAR(SYSTEMATICS_RES, int, 1000, "How often should we print phylodiversity stats?");
   CONFIG_ADD_VAR(EMP_PHYLO_STORE_ANCESTORS, bool, 1, "Should the emp::Systematics store ancestors?");
+  CONFIG_ADD_VAR(EMP_PHYLO, bool, 1, "Should the emp::Systematics be enabled?");
 
   // -------- Topology config options --------
   CONFIG_ADD_GROUP(TOPOLOGY_GROUP, "World topology");

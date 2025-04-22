@@ -32,6 +32,7 @@
 #include "cAvidaContext.h"
 #include "avida/core/InstructionSequence.h"
 #include "avida/core/Genome.h"
+#include "avida/private/systematics/GenotypeArbiter.h"
 
 #include "Evolve/Systematics.hpp"
 #include "Evolve/SystematicsAnalysis.hpp"
@@ -189,6 +190,7 @@ public:
   using taxon_t = emp::Taxon< org_info_t, emp::datastruct::mut_landscape_info<Phenotype>>;
   emp::Ptr<taxon_t> mrca_ptr;
   int avida_coalescent_depth;
+  Systematics::GenotypePtr avida_mrca_ptr = Systematics::GenotypePtr(NULL);
   size_t mrca_changes=0;
 
   emp::vector<bool> first_time_completed_tasks;
