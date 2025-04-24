@@ -292,9 +292,6 @@ bool cWorld::setup(World* new_world, cUserFeedback* feedback, const Apto::Map<Ap
     });
     OnOffspringReady([this](cOrganism & org){
       systematics_manager->AddOrg(org, emp::WorldPosition(next_cell_id,0));
-      const size_t birth_loc = (size_t)next_cell_id;
-      emp_assert(birth_loc < m_pop->GetSize());
-      births_per_location[birth_loc] += 1;
     });
     OnOrgDeath([this](int pos){
       systematics_manager->RemoveOrgAfterRepro(emp::WorldPosition(pos, 0));
@@ -390,6 +387,12 @@ bool cWorld::setup(World* new_world, cUserFeedback* feedback, const Apto::Map<Ap
 
   births_per_location.clear();
   births_per_location.resize(m_pop->GetSize(), 0);
+
+  OnOffspringReady([this](cOrganism & org){
+    const size_t birth_loc = (size_t)next_cell_id;
+    emp_assert(birth_loc < m_pop->GetSize());
+    births_per_location[birth_loc] += 1;
+  });
 
   return success;
 }
